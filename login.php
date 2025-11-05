@@ -51,6 +51,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button class="btn btn-primary w-100">Masuk</button>
           </form>
         </div>
+        <!-- di bawah tombol "Masuk" -->
+        <p class="text-center mt-3">
+        Belum punya akun? <a href="register.php">Daftar di sini</a>
+        </p>
       </div>
       <p class="text-center text-muted mt-3" style="font-size:13px">Admin default: admin@lab.test / admin123</p>
     </div>
