@@ -14,22 +14,40 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   $email = trim($_POST['email'] ?? '');
   $pass  = $_POST['password'] ?? '';
 
-  $stmt = $conn->prepare("SELECT * FROM users WHERE email = ?");
+  // Ambil user dari tabel 'pengguna'
+  $stmt = $conn->prepare("SELECT id, nama, email, sandi, peran, prodi, nim, diblokir FROM pengguna WHERE email = ? LIMIT 1");
   $stmt->bind_param('s', $email);
   $stmt->execute();
   $res = $stmt->get_result();
+
   if ($res && $res->num_rows === 1) {
     $u = $res->fetch_assoc();
-    if (password_verify($pass, $u['password'])) {
-      $_SESSION['user'] = $u;
-      if (in_array($u['role'], ['admin','laboran'])) {
+
+    if (!empty($u['diblokir'])) {
+      $error = "Akun Anda diblokir. Hubungi admin.";
+    } elseif (password_verify($pass, $u['sandi'])) {
+      // Simpan ke session dengan key yang konsisten (nama & peran)
+      $_SESSION['user'] = [
+        'id'     => $u['id'],
+        'nama'   => $u['nama'],
+        'email'  => $u['email'],
+        'peran'  => $u['peran'],
+        'prodi'  => $u['prodi'] ?? null,
+        'nim'    => $u['nim'] ?? null,
+      ];
+
+      // Arahkan sesuai peran
+      if (in_array($u['peran'], ['admin','laboran'], true)) {
         header('Location: /admin/dashboard.php'); exit;
       } else {
         header('Location: /peminjam/dashboard.php'); exit;
       }
+    } else {
+      $error = "Email atau password salah.";
     }
+  } else {
+    $error = "Email atau password salah.";
   }
-  $error = "Email atau password salah.";
 }
 ?>
 <div class="container">
@@ -38,7 +56,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
       <div class="card shadow-sm">
         <div class="card-body p-4">
           <h4 class="mb-3">SiPinLab — Login</h4>
-          <?php if($error): ?><div class="alert alert-danger py-2"><?=$error?></div><?php endif; ?>
+          <?php if($error): ?><div class="alert alert-danger py-2"><?= e($error) ?></div><?php endif; ?>
           <form method="post" autocomplete="off">
             <div class="mb-3">
               <label class="form-label">Email</label>
@@ -51,13 +69,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             <button class="btn btn-primary w-100">Masuk</button>
           </form>
         </div>
-        <!-- di bawah tombol "Masuk" -->
+
         <p class="text-center mt-3">
-        Belum punya akun? <a href="register.php">Daftar di sini</a>
+          Belum punya akun? <a href="register.php">Daftar di sini</a>
         </p>
       </div>
-      <p class="text-center text-muted mt-3" style="font-size:13px">Admin default: admin@lab.test / admin123</p>
+      <p class="text-center text-muted mt-3" style="font-size:13px">
+        Admin default: <code>admin@lab.test</code> / <code>admin123</code>
+      </p>
     </div>
   </div>
 </div>
-</body></html>
+</body>
+</html>

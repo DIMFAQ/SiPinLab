@@ -5,7 +5,7 @@ session_start();
 $host = 'localhost';
 $user = 'root';
 $pass = '';
-$db   = 'lab_loans';
+$db   = 'sipinlab';
 
 $conn = new mysqli($host, $user, $pass, $db);
 if ($conn->connect_error) {
@@ -21,7 +21,7 @@ function require_login() {
 function require_role(...$roles) {
   require_login();
   $u = current_user();
-  if (!in_array($u['role'], $roles)) {
+  if (!in_array($u['peran'], $roles)) {
     http_response_code(403);
     echo "<!doctype html><meta charset='utf-8'><div style='padding:24px;font-family:system-ui'>
             <h3>403 Forbidden</h3><p>Anda tidak memiliki akses.</p>

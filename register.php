@@ -1,43 +1,51 @@
 <?php
 require __DIR__.'/db.php';
+
 $error = '';
 $success = '';
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-  $name  = trim($_POST['name'] ?? '');
+  $nama  = trim($_POST['name']  ?? '');   // form masih pakai name="name" biar kompatibel
   $email = strtolower(trim($_POST['email'] ?? ''));
-  $pass1 = $_POST['password'] ?? '';
+  $pass1 = $_POST['password']  ?? '';
   $pass2 = $_POST['password2'] ?? '';
 
-  if ($name === '' || $email === '' || $pass1 === '' || $pass2 === '') {
+  // Validasi dasar
+  if ($nama === '' || $email === '' || $pass1 === '' || $pass2 === '') {
     $error = 'Semua kolom wajib diisi.';
   } elseif (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
     $error = 'Format email tidak valid.';
   } elseif ($pass1 !== $pass2) {
     $error = 'Konfirmasi password tidak sama.';
+  } elseif (strlen($pass1) < 6) {
+    $error = 'Password minimal 6 karakter.';
   } else {
-    // cek email sudah terdaftar?
-    $stmt = $conn->prepare("SELECT id FROM users WHERE LOWER(email)=?");
+    // Cek email duplikat
+    $stmt = $conn->prepare("SELECT id FROM pengguna WHERE LOWER(email)=? LIMIT 1");
     $stmt->bind_param('s', $email);
     $stmt->execute();
     $res = $stmt->get_result();
 
-    if ($res->num_rows > 0) {
+    if ($res && $res->num_rows > 0) {
       $error = 'Email sudah terdaftar.';
     } else {
+      // Simpan user baru
       $hash = password_hash($pass1, PASSWORD_BCRYPT);
-      $stmt = $conn->prepare("INSERT INTO users(name,email,password,role,is_blocked) VALUES(?, ?, ?, 'peminjam', 0)");
-      $stmt->bind_param('sss', $name, $email, $hash);
+
+      $stmt = $conn->prepare("
+        INSERT INTO pengguna(nama, email, sandi, peran, diblokir)
+        VALUES(?, ?, ?, 'peminjam', 0)
+      ");
+      $stmt->bind_param('sss', $nama, $email, $hash);
       $stmt->execute();
 
-      // login otomatis setelah daftar
-      $newUser = [
-        'id' => $conn->insert_id,
-        'name' => $name,
+      // Set session (pakai key konsisten dengan db.php: nama & peran)
+      $_SESSION['user'] = [
+        'id'    => $conn->insert_id,
+        'nama'  => $nama,
         'email' => $email,
-        'role' => 'peminjam'
+        'peran' => 'peminjam',
       ];
-      $_SESSION['user'] = $newUser;
 
       header('Location: /peminjam/dashboard.php');
       exit;
@@ -61,8 +69,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <div class="card-body p-4">
           <h4 class="mb-3 text-center">Daftar Akun Peminjam</h4>
 
-          <?php if($error): ?><div class="alert alert-danger py-2"><?=htmlspecialchars($error)?></div><?php endif; ?>
-          <?php if($success): ?><div class="alert alert-success py-2"><?=htmlspecialchars($success)?></div><?php endif; ?>
+          <?php if($error): ?><div class="alert alert-danger py-2"><?= e($error) ?></div><?php endif; ?>
+          <?php if($success): ?><div class="alert alert-success py-2"><?= e($success) ?></div><?php endif; ?>
 
           <form method="post" autocomplete="on">
             <div class="mb-3">
@@ -95,4 +103,5 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     </div>
   </div>
 </div>
-</body></html>
+</body>
+</html>
