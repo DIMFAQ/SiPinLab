@@ -1,56 +1,112 @@
-CREATE DATABASE lab_loans;
-USE lab_loans;
+-- ===== DATABASE =====
+DROP DATABASE IF EXISTS sipinlab;
+CREATE DATABASE sipinlab;
+USE sipinlab;
 
-CREATE TABLE users (
+-- ===== TABEL PENGGUNA =====
+CREATE TABLE pengguna (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
+  nama VARCHAR(100) NOT NULL,
   email VARCHAR(100) NOT NULL UNIQUE,
-  password VARCHAR(255) NOT NULL,
-  role ENUM('admin','laboran','peminjam') DEFAULT 'peminjam',
-  prodi VARCHAR(80), nim VARCHAR(30),
-  is_blocked BOOLEAN DEFAULT 0
+  sandi VARCHAR(255) NOT NULL,
+  peran ENUM('admin','laboran','peminjam') DEFAULT 'peminjam',
+  prodi VARCHAR(80),
+  nim VARCHAR(30),
+  diblokir BOOLEAN DEFAULT 0
 );
 
-CREATE TABLE categories (
+-- ===== TABEL KATEGORI ALAT =====
+CREATE TABLE kategori (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL UNIQUE
+  nama VARCHAR(100) NOT NULL UNIQUE
 );
 
-CREATE TABLE locations (
+-- ===== TABEL LOKASI =====
+CREATE TABLE lokasi (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  name VARCHAR(100) NOT NULL,
-  room VARCHAR(50),
-  shelf VARCHAR(50)
+  nama VARCHAR(100) NOT NULL,
+  ruang VARCHAR(50),
+  rak VARCHAR(50)
 );
 
-CREATE TABLE items (
+-- ===== TABEL ALAT =====
+CREATE TABLE alat (
   id INT AUTO_INCREMENT PRIMARY KEY,
-  code_unique VARCHAR(50) NOT NULL UNIQUE,
-  name VARCHAR(120) NOT NULL,
-  category_id INT NOT NULL,
-  location_id INT NOT NULL,
-  condition_enum ENUM('new','good','fair','broken') DEFAULT 'good',
-  total_qty INT DEFAULT 0,
-  available_qty INT DEFAULT 0,
-  min_qty_alert INT DEFAULT 1,
-  notes TEXT,
-  FOREIGN KEY (category_id) REFERENCES categories(id),
-  FOREIGN KEY (location_id) REFERENCES locations(id)
+  kode_unik VARCHAR(50) NOT NULL UNIQUE,
+  nama VARCHAR(120) NOT NULL,
+  kategori_id INT NOT NULL,
+  lokasi_id INT NOT NULL,
+  kondisi_enum ENUM('baru','baik','cukup','rusak') DEFAULT 'baik',
+  jumlah_total INT DEFAULT 0,
+  jumlah_tersedia INT DEFAULT 0,
+  minimum_alert INT DEFAULT 1,
+  catatan TEXT,
+  CONSTRAINT fk_alat_kategori FOREIGN KEY (kategori_id) REFERENCES kategori(id),
+  CONSTRAINT fk_alat_lokasi   FOREIGN KEY (lokasi_id)   REFERENCES lokasi(id)
 );
 
--- Admin default (password: admin123)
-INSERT INTO users(name,email,password,role)
-VALUES(
-  'Admin Lab',
-  'admin@lab.test',
-  '$2y$10$vdTAgC29RR7D9tEzyL1Cj.Mf/5oMhtk0D4bRQ1CmxHKT0QkkS4BGq',
-  'admin'
+-- ===== USER DEFAULT (password: admin123 / peminjam123) =====
+-- Hash admin123
+INSERT INTO pengguna(nama,email,sandi,peran) VALUES
+('Admin Lab',  'admin@lab.test',  '$2y$10$vdTAgC29RR7D9tEzyL1Cj.Mf/5oMhtk0D4bRQ1CmxHKT0QkkS4BGq', 'admin'),
+('Admin Lab 2','admin2@lab.test', '$2y$10$vdTAgC29RR7D9tEzyL1Cj.Mf/5oMhtk0D4bRQ1CmxHKT0QkkS4BGq', 'admin');
+
+-- Hash peminjam123
+INSERT INTO pengguna(nama,email,sandi,peran) VALUES
+('Peminjam Satu','peminjam@lab.test','$2y$10$e2vY6IuLqk3JpC8m9MfTJu1z8B3c8X5f0vHf1n7a0uR2iV.3vG0pW','peminjam');
+
+-- ===== TABEL PEMINJAMAN =====
+CREATE TABLE peminjaman (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  pengguna_id INT NOT NULL,
+  tanggal_pinjam DATE NOT NULL,
+  tanggal_kembali_rencana DATE,
+  tanggal_kembali DATE,
+  status ENUM('Menunggu','Disetujui','Ditolak','Selesai') DEFAULT 'Menunggu',
+  denda INT DEFAULT 0,
+  keterangan TEXT,
+  dibuat_pada TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_peminjaman_pengguna FOREIGN KEY (pengguna_id) REFERENCES pengguna(id)
 );
 
-INSERT INTO users(name,email,password,role)
-VALUES(
-  'Admin Lab 2',
-  'admin2@lab.test',
-  'admin123',
-  'admin'
+-- ===== TABEL DETAIL PEMINJAMAN =====
+CREATE TABLE detail_peminjaman (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  peminjaman_id INT NOT NULL,
+  alat_id INT NOT NULL,
+  jumlah INT NOT NULL,
+  CONSTRAINT fk_detail_peminjaman FOREIGN KEY (peminjaman_id) REFERENCES peminjaman(id) ON DELETE CASCADE,
+  CONSTRAINT fk_detail_alat        FOREIGN KEY (alat_id)        REFERENCES alat(id)
 );
+
+-- ===== CONTOH QUERY LIST UNTUK HALAMAN ADMIN (ada hari_telat & daftar_alat) =====
+SELECT
+  p.id,
+  p.pengguna_id,
+  p.tanggal_pinjam,
+  p.tanggal_kembali_rencana,
+  p.tanggal_kembali,
+  p.status,
+  COALESCE(p.denda,0) AS denda,
+  g.nama AS nama_peminjam,
+  GREATEST(DATEDIFF(CURDATE(), p.tanggal_kembali_rencana), 0) AS hari_telat,
+  d.daftar_alat
+FROM peminjaman p
+JOIN pengguna g ON g.id = p.pengguna_id
+LEFT JOIN (
+  SELECT
+    dp.peminjaman_id,
+    GROUP_CONCAT(CONCAT(a.nama,' (',dp.jumlah,')') ORDER BY a.nama SEPARATOR ', ') AS daftar_alat
+  FROM detail_peminjaman dp
+  JOIN alat a ON a.id = dp.alat_id
+  GROUP BY dp.peminjaman_id
+) d ON d.peminjaman_id = p.id
+ORDER BY p.id DESC;
+
+-- ===== CEK STRUKTUR =====
+DESCRIBE pengguna;
+DESCRIBE kategori;
+DESCRIBE lokasi;
+DESCRIBE alat;
+DESCRIBE peminjaman;
+DESCRIBE detail_peminjaman;
